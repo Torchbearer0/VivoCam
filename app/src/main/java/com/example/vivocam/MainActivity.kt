@@ -22,6 +22,7 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
@@ -71,7 +72,7 @@ class MainActivity : AppCompatActivity() {
     private var timerSeconds = 0
     private var captureCountdownActive = false
     private var gridEnabled = false
-    private var aspectRatio = ImageCapture.ASPECT_RATIO_4_3
+    private var aspectRatio = AspectRatio.RATIO_4_3
     private var videoQuality = Quality.FHD
     private var lastMediaUri: Uri? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -392,9 +393,9 @@ class MainActivity : AppCompatActivity() {
     }
     private fun chooseAspectRatio() {
         val choices = arrayOf("4:3 (standard photo)", "16:9 (wide photo)")
-        val selected = if (aspectRatio == ImageCapture.ASPECT_RATIO_16_9) 1 else 0
+        val selected = if (aspectRatio == AspectRatio.RATIO_16_9) 1 else 0
         android.app.AlertDialog.Builder(this).setTitle("Photo aspect ratio").setSingleChoiceItems(choices, selected) { dialog, which ->
-            aspectRatio = if (which == 1) ImageCapture.ASPECT_RATIO_16_9 else ImageCapture.ASPECT_RATIO_4_3
+            aspectRatio = if (which == 1) AspectRatio.RATIO_16_9 else AspectRatio.RATIO_4_3
             ratioButton.text = if (which == 1) "16:9" else "4:3"
             dialog.dismiss(); startCamera()
         }.setNegativeButton("Cancel", null).show()
