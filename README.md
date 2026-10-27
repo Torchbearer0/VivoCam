@@ -27,14 +27,23 @@ gradle assembleDebug
 
 The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Included and functional
+## Included and functional in v0.2.0
 
-- CameraX live preview
-- Standard photo capture saved to `Pictures/VivoCam`
-- 1080p video recording saved to `Movies/VivoCam`
+- CameraX live preview and standard still photo capture to `Pictures/VivoCam`
+- Video recording with microphone audio (when permission is granted), saved to `Movies/VivoCam`
 - Front/back camera switching
-- Zoom buttons clamped to the active camera's reported zoom range
-- Bottom mode strip and UI scaffold for Pro, Portrait, Night, Long Exposure, Clone, 360°, Cinematic and Astro modes
+- Flash cycle: Off / Auto / On when supported by the active camera
+- Photo timer: Off / 3 / 5 / 10 seconds, with visible countdown
+- Photo aspect ratio: 4:3 and 16:9
+- Pinch-to-zoom plus 0.6× / 1× / 2× / 5× presets, clamped to the active camera's reported zoom range
+- Tap-to-focus / meter, plus a center-focus button
+- Exposure compensation slider with reset, using the active camera's reported EV range
+- Composition grid toggle
+- Video quality selector for 720p / 1080p / 4K, with CameraX fallback when a quality is unsupported
+- Settings menu and open-latest-media shortcut
+- HyperOS-inspired dark camera layout and mode strip
+
+These controls are wired into CameraX rather than being decorative buttons. Actual flash, zoom, exposure range, focus behavior, and video resolution depend on the lens and device firmware.
 
 ## Important limitations
 
@@ -64,3 +73,11 @@ The project targets Android 8.0+ and uses CameraX 1.4.1. Actual lens availabilit
 4. Add clone capture guide, mask editor and compositor.
 5. Add guided panorama capture and stitching for 360° output.
 6. Prototype cinematic video with supported stabilization, focus tracking and post-processing; verify performance on the X60 Pro.
+
+## Build reliability
+
+The GitHub Actions workflow retries dependency resolution only when logs indicate a transient Maven/network problem (such as HTTP 429). Kotlin or Android compilation errors fail immediately, so a code issue does not trigger several unnecessary rebuilds inside one run.
+
+## Advanced modes still on the roadmap
+
+Pro currently exposes exposure compensation, focus, and zoom, but not manual ISO/shutter-time sliders. Long-exposure effects, astro stacking, clone compositing, 360° stitching, portrait depth processing, and cinematic depth effects need dedicated capture/processing pipelines and are not yet implemented.
