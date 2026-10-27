@@ -27,7 +27,7 @@ gradle assembleDebug
 
 The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Included and functional in v0.2.0
+## Included and functional in v0.3.0
 
 - CameraX live preview and standard still photo capture to `Pictures/VivoCam`
 - Video recording with microphone audio (when permission is granted), saved to `Movies/VivoCam`
@@ -40,16 +40,18 @@ The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 - Exposure compensation slider with reset, using the active camera's reported EV range
 - Composition grid toggle
 - Video quality selector for 720p / 1080p / 4K, with CameraX fallback when a quality is unsupported
+- Pro controls for manual ISO and shutter time when the active Camera2 device reports manual-sensor capability
+- Manual exposure controls show the reported ISO/shutter ranges; enabling them disables automatic exposure and flash
 - Settings menu and open-latest-media shortcut
-- HyperOS-inspired dark camera layout and mode strip
+- Refined rounded control surfaces, clearer mode/status labels, and a consistent dark camera layout
 
 These controls are wired into CameraX rather than being decorative buttons. Actual flash, zoom, exposure range, focus behavior, and video resolution depend on the lens and device firmware.
 
 ## Important limitations
 
-Advanced mode buttons are UI/roadmap scaffolds, not implemented capture algorithms. They display a message instead of pretending to produce these effects.
+Advanced mode buttons are still UI/roadmap scaffolds unless explicitly listed as functional below. They display a message instead of pretending to produce computational effects.
 
-- **Long exposure:** requires manual sensor exposure if supported by the selected camera, or frame accumulation/stacking. CameraX standard still capture alone does not guarantee multi-second shutter control.
+- **Long exposure:** the Pro panel can request manual shutter times only when the active camera reports manual-sensor capability. Waterfall/trail effects and robust long-exposure capture still need dedicated capture/stacking pipelines.
 - **Waterfall, fireworks, light painting/trails, traffic trails, star trails:** need per-mode exposure strategy, burst/frame accumulation, alignment and blending.
 - **Milky Way / M31:** requires RAW/manual exposure where available, dark-frame handling and stacking. A phone lens/sensor has real limits for deep-sky detail.
 - **Clone:** requires multiple timed captures, a stable camera, alignment, masks and compositing UI.
@@ -67,8 +69,8 @@ The project targets Android 8.0+ and uses CameraX 1.4.1. Actual lens availabilit
 
 ## Suggested next implementation order
 
-1. Read Camera2 characteristics for each physical/logical lens and expose only supported controls.
-2. Add Camera2 interop for supported exposure time, ISO, focus and RAW capture; report unsupported settings clearly.
+1. Verify manual ISO/shutter behavior on each Vivo X60 Pro lens; improve per-lens switching and persistence.
+2. Add supported RAW/DNG capture through a compatible Camera2 capture pipeline.
 3. Implement burst/frame-stack capture for long exposure and astrophotography, with alignment and robust processing.
 4. Add clone capture guide, mask editor and compositor.
 5. Add guided panorama capture and stitching for 360° output.
@@ -80,4 +82,4 @@ The GitHub Actions workflow retries dependency resolution only when logs indicat
 
 ## Advanced modes still on the roadmap
 
-Pro currently exposes exposure compensation, focus, and zoom, but not manual ISO/shutter-time sliders. Long-exposure effects, astro stacking, clone compositing, 360° stitching, portrait depth processing, and cinematic depth effects need dedicated capture/processing pipelines and are not yet implemented.
+Manual ISO/shutter controls are now available on cameras that report Camera2 manual-sensor capability. RAW/DNG capture, long-exposure stacking, astro stacking, clone compositing, 360° stitching, portrait depth processing, and cinematic depth effects still need dedicated capture/processing pipelines and are not yet implemented.

@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.vivocam"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     // Keep Java and Kotlin bytecode targets aligned for Gradle validation.

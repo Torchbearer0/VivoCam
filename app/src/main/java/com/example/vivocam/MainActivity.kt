@@ -8,6 +8,9 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -22,6 +25,8 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
@@ -74,6 +79,15 @@ class MainActivity : AppCompatActivity() {
     private var gridEnabled = false
     private var aspectRatio = AspectRatio.RATIO_4_3
     private var videoQuality = Quality.FHD
+    private var manualExposureEnabled = false
+    private var manualSupported = false
+    private var manualIso = 400
+    private var manualExposureTimeNs = 10_000_000L
+    private var manualIsoMin = 50
+    private var manualIsoMax = 3200
+    private var manualExposureMinNs = 125_000L
+    private var manualExposureMaxNs = 1_000_000_000L
+    private var activeCameraId: String? = null
     private var lastMediaUri: Uri? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val modes = listOf("PRO", "VIDEO", "PHOTO", "PORTRAIT", "NIGHT", "LONG EXP", "CLONE", "360°", "CINEMA", "ASTRO")
@@ -176,6 +190,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectMode(mode: String, row: LinearLayout) {
         if (isRecording && mode != "VIDEO" && mode != "CINEMA") stopRecording()
+        if ((mode == "VIDEO" || mode == "CINEMA") && manualExposureEnabled) {
+            manualExposureEnabled = false
+            startCamera()
+        }
         currentMode = mode
         modeLabel.text = when (mode) {
             "LONG EXP" -> "LONG EXPOSURE · Tripod recommended"
@@ -183,7 +201,7 @@ class MainActivity : AppCompatActivity() {
             "CLONE" -> "CLONE · Capture multiple poses"
             "360°" -> "360° · Sweep slowly around yourself"
             "CINEMA" -> "CINEMATIC VIDEO · Standard video on this build"
-            "PRO" -> "PRO · Tap EV to adjust exposure"
+            "PRO" -> "PRO · ISO / shutter / EV"
             "NIGHT" -> "NIGHT · Keep the phone steady"
             "PORTRAIT" -> "PORTRAIT · Depth effect depends on device"
             else -> mode
@@ -194,14 +212,17 @@ class MainActivity : AppCompatActivity() {
         }
         val isVideo = mode == "VIDEO" || mode == "CINEMA"
         captureRing.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(if (isVideo) 0xFFE84B4B.toInt() else 0xFFD8F36A.toInt()) }
-        if (mode in listOf("LONG EXP", "ASTRO", "CLONE", "360°", "CINEMA", "PRO", "PORTRAIT", "NIGHT")) {
+        if (mode == "PRO") {
+            showProControls()
+            return
+        }
+        if (mode in listOf("LONG EXP", "ASTRO", "CLONE", "360°", "CINEMA", "PORTRAIT", "NIGHT")) {
             val message = when (mode) {
                 "LONG EXP" -> "This build provides stable photo capture and exposure compensation. True multi-second shutter and light-trail stacking are planned separately."
                 "ASTRO" -> "Astro stacking and Milky Way processing are not implemented yet. Use a tripod; results depend on sensor and lens limits."
                 "CLONE" -> "Clone compositing needs multiple aligned frames and a masking editor; this mode is currently a guided placeholder."
                 "360°" -> "360° stitching needs guided overlapping frames and panorama stitching; this mode is currently a placeholder."
                 "CINEMA" -> "Video recording works, but depth-based subject separation is not included in this build."
-                "PRO" -> "Use EV ± for exposure compensation, tap the preview to focus, and pinch to zoom. Manual ISO/shutter controls are not yet enabled."
                 "PORTRAIT" -> "Portrait depth processing depends on device support and is not yet added."
                 else -> "Night mode currently uses the standard quality photo pipeline; computational night stacking is not added yet."
             }
@@ -213,17 +234,21 @@ class MainActivity : AppCompatActivity() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
             val provider = future.get()
-            val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
-            imageCapture = ImageCapture.Builder()
+            val previewBuilder = Preview.Builder()
+            applyManualExposure(previewBuilder)
+            val preview = previewBuilder.build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+            val imageBuilder = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                 .setTargetAspectRatio(aspectRatio)
-                .setFlashMode(flashMode)
-                .build()
+                .setFlashMode(if (manualExposureEnabled) ImageCapture.FLASH_MODE_OFF else flashMode)
+            applyManualExposure(imageBuilder)
+            imageCapture = imageBuilder.build()
             val recorder = Recorder.Builder().setQualitySelector(QualitySelector.from(videoQuality, FallbackStrategy.lowerQualityOrHigherThan(videoQuality))).build()
             videoCapture = VideoCapture.withOutput(recorder)
             try {
                 provider.unbindAll()
                 camera = provider.bindToLifecycle(this, CameraSelector.Builder().requireLensFacing(lensFacing).build(), preview, imageCapture, videoCapture)
+                refreshManualCapabilities()
                 updateFlashUi()
                 setZoom(zoom)
             } catch (e: Exception) {
@@ -330,6 +355,7 @@ class MainActivity : AppCompatActivity() {
     private fun switchCamera() {
         if (isRecording) { Toast.makeText(this, "Stop recording before switching cameras", Toast.LENGTH_SHORT).show(); return }
         lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
+        manualExposureEnabled = false
         startCamera()
     }
 
@@ -372,6 +398,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cycleFlash() {
+        if (manualExposureEnabled) { Toast.makeText(this, "Flash is disabled while manual exposure is active", Toast.LENGTH_SHORT).show(); return }
         val available = camera?.cameraInfo?.hasFlashUnit() == true
         if (!available) { Toast.makeText(this, "Flash is unavailable on this camera", Toast.LENGTH_SHORT).show(); return }
         flashMode = when (flashMode) { ImageCapture.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_AUTO; ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON; else -> ImageCapture.FLASH_MODE_OFF }
@@ -380,7 +407,7 @@ class MainActivity : AppCompatActivity() {
     }
     private fun updateFlashUi() {
         val available = camera?.cameraInfo?.hasFlashUnit() == true
-        flashButton.text = when { !available -> "⚡ N/A"; flashMode == ImageCapture.FLASH_MODE_AUTO -> "⚡ AUTO"; flashMode == ImageCapture.FLASH_MODE_ON -> "⚡ ON"; else -> "⚡ OFF" }
+        flashButton.text = when { manualExposureEnabled -> "⚡ PRO"; !available -> "⚡ N/A"; flashMode == ImageCapture.FLASH_MODE_AUTO -> "⚡ AUTO"; flashMode == ImageCapture.FLASH_MODE_ON -> "⚡ ON"; else -> "⚡ OFF" }
         flashButton.alpha = if (available) 1f else .55f
     }
     private fun chooseTimer() {
@@ -413,6 +440,141 @@ class MainActivity : AppCompatActivity() {
         }.setNegativeButton("Cancel", null).show()
     }
 
+    private fun applyManualExposure(builder: Preview.Builder) {
+        if (!manualExposureEnabled) return
+        Camera2Interop.Extender(builder)
+            .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+            .setCaptureRequestOption(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, manualIso.coerceIn(manualIsoMin, manualIsoMax))
+            .setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, manualExposureTimeNs.coerceIn(manualExposureMinNs, manualExposureMaxNs))
+    }
+
+    private fun applyManualExposure(builder: ImageCapture.Builder) {
+        if (!manualExposureEnabled) return
+        Camera2Interop.Extender(builder)
+            .setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+            .setCaptureRequestOption(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            .setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, manualIso.coerceIn(manualIsoMin, manualIsoMax))
+            .setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, manualExposureTimeNs.coerceIn(manualExposureMinNs, manualExposureMaxNs))
+    }
+
+    private fun refreshManualCapabilities() {
+        val active = camera ?: return
+        try {
+            val id = Camera2CameraInfo.from(active.cameraInfo).cameraId
+            activeCameraId = id
+            val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+            val chars = manager.getCameraCharacteristics(id)
+            val capabilities = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
+            manualSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
+            chars.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)?.let { range ->
+                manualIsoMin = range.lower
+                manualIsoMax = range.upper
+            }
+            chars.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)?.let { range ->
+                manualExposureMinNs = range.lower
+                manualExposureMaxNs = range.upper
+            }
+            manualIso = manualIso.coerceIn(manualIsoMin, manualIsoMax)
+            manualExposureTimeNs = manualExposureTimeNs.coerceIn(manualExposureMinNs, manualExposureMaxNs)
+            if (!manualSupported && manualExposureEnabled) manualExposureEnabled = false
+        } catch (_: Exception) {
+            manualSupported = false
+            manualExposureEnabled = false
+        }
+    }
+
+    private fun showProControls() {
+        refreshManualCapabilities()
+        if (!manualSupported) {
+            android.app.AlertDialog.Builder(this).setTitle("Pro controls unavailable")
+                .setMessage("The active camera does not report Android manual-sensor support. You can still use EV compensation, tap-to-focus and zoom.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val isoLabel = TextView(this).apply { setTextColor(Color.WHITE); textSize = 14f; gravity = Gravity.CENTER }
+        val isoSeek = SeekBar(this).apply {
+            max = (manualIsoMax - manualIsoMin).coerceAtLeast(1)
+            progress = (manualIso - manualIsoMin).coerceIn(0, max)
+        }
+        fun updateIsoLabel(value: Int) { isoLabel.text = "ISO $value  ·  range $manualIsoMin–$manualIsoMax" }
+        updateIsoLabel(manualIso)
+        isoSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) { updateIsoLabel(manualIsoMin + progress) }
+            override fun onStartTrackingTouch(bar: SeekBar?) {}
+            override fun onStopTrackingTouch(bar: SeekBar?) {}
+        })
+
+        val exposureChoices = listOf(
+            125_000L to "1/8000 s", 250_000L to "1/4000 s", 500_000L to "1/2000 s", 1_000_000L to "1/1000 s",
+            2_000_000L to "1/500 s", 4_000_000L to "1/250 s", 8_000_000L to "1/125 s", 16_666_667L to "1/60 s",
+            33_333_333L to "1/30 s", 66_666_667L to "1/15 s", 125_000_000L to "1/8 s", 250_000_000L to "1/4 s",
+            500_000_000L to "1/2 s", 1_000_000_000L to "1 s", 2_000_000_000L to "2 s", 4_000_000_000L to "4 s",
+            8_000_000_000L to "8 s", 15_000_000_000L to "15 s", 30_000_000_000L to "30 s"
+        ).filter { it.first in manualExposureMinNs..manualExposureMaxNs }
+        val usableChoices = if (exposureChoices.isEmpty()) listOf(manualExposureMinNs to formatShutter(manualExposureMinNs)) else exposureChoices
+        val shutterLabel = TextView(this).apply { text = "Shutter speed"; setTextColor(Color.WHITE); textSize = 14f; setPadding(0, dp(10), 0, dp(4)) }
+        val shutterAdapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, usableChoices.map { it.second }) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                (super.getView(position, convertView, parent) as TextView).apply { setTextColor(Color.WHITE) }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+                (super.getDropDownView(position, convertView, parent) as TextView).apply { setTextColor(Color.WHITE); setBackgroundColor(0xFF202329.toInt()) }
+        }.apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        val shutterSpinner = Spinner(this).apply {
+            adapter = shutterAdapter
+            val selected = usableChoices.indexOfFirst { it.first == manualExposureTimeNs }.let { if (it >= 0) it else usableChoices.indices.minByOrNull { index -> kotlin.math.abs(usableChoices[index].first - manualExposureTimeNs) } ?: 0 }
+            setSelection(selected)
+        }
+        val enable = CheckBox(this).apply {
+            text = "Enable manual exposure (disables auto exposure and flash)"
+            setTextColor(Color.WHITE)
+            buttonTintList = android.content.res.ColorStateList.valueOf(0xFFD8F36A.toInt())
+            isChecked = manualExposureEnabled
+        }
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(8), dp(22), dp(4))
+            setBackgroundColor(0xFF202329.toInt())
+            addView(enable)
+            addView(isoLabel, LinearLayout.LayoutParams(-1, dp(32)))
+            addView(isoSeek, LinearLayout.LayoutParams(-1, dp(44)))
+            addView(shutterLabel, LinearLayout.LayoutParams(-1, dp(28)))
+            addView(shutterSpinner, LinearLayout.LayoutParams(-1, dp(48)))
+        }
+        android.app.AlertDialog.Builder(this).setTitle("Pro · Manual exposure").setView(panel)
+            .setNeutralButton("Auto", null)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Apply", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                        manualExposureEnabled = false
+                        startCamera()
+                        modeLabel.text = "PRO · Auto exposure"
+                        updateFlashUi()
+                        dialog.dismiss()
+                    }
+                    dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        manualIso = manualIsoMin + isoSeek.progress
+                        manualExposureTimeNs = usableChoices[shutterSpinner.selectedItemPosition.coerceIn(0, usableChoices.lastIndex)].first
+                        manualExposureEnabled = enable.isChecked
+                        if (manualExposureEnabled) flashMode = ImageCapture.FLASH_MODE_OFF
+                        startCamera()
+                        modeLabel.text = if (manualExposureEnabled) "PRO · ISO $manualIso · ${formatShutter(manualExposureTimeNs)}" else "PRO · Auto exposure"
+                        updateFlashUi()
+                        dialog.dismiss()
+                    }
+                }
+            }.show()
+    }
+
+    private fun formatShutter(nanos: Long): String {
+        if (nanos <= 0L) return "Auto"
+        val seconds = nanos / 1_000_000_000.0
+        return if (seconds >= 1.0) String.format(Locale.US, "%.1f", seconds).removeSuffix(".0") + " s"
+        else "1/${(1.0 / seconds).toInt().coerceAtLeast(1)} s"
+    }
+
     private fun showExposureCompensation() {
         val activeCamera = camera ?: run { Toast.makeText(this, "Camera is still starting", Toast.LENGTH_SHORT).show(); return }
         val state = activeCamera.cameraInfo.exposureState
@@ -435,22 +597,25 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Done", null).show()
     }
     private fun showSettings() {
-        val options = arrayOf("Exposure compensation", "Photo timer", "Photo aspect ratio", "Video quality", "Composition grid", "Reset zoom", "About camera support")
+        val options = arrayOf("Pro controls · ISO / shutter", "Exposure compensation", "Photo timer", "Photo aspect ratio", "Video quality", "Composition grid", "Reset zoom", "About camera support")
         android.app.AlertDialog.Builder(this).setTitle("VivoCam settings").setItems(options) { _, which ->
             when (which) {
-                0 -> showExposureCompensation()
-                1 -> chooseTimer()
-                2 -> chooseAspectRatio()
-                3 -> chooseVideoQuality()
-                4 -> { gridEnabled = !gridEnabled; gridOverlay.visibility = if (gridEnabled) View.VISIBLE else View.GONE; gridButton.text = if (gridEnabled) "Grid ON" else "Grid OFF" }
-                5 -> setZoom(1f)
-                else -> android.app.AlertDialog.Builder(this).setTitle("Camera support").setMessage("VivoCam uses Android CameraX. Available zoom, flash, exposure, focus, and video quality depend on the active lens and device firmware. Advanced computational modes are not yet implemented.").setPositiveButton("OK", null).show()
+                0 -> showProControls()
+                1 -> showExposureCompensation()
+                2 -> chooseTimer()
+                3 -> chooseAspectRatio()
+                4 -> chooseVideoQuality()
+                5 -> { gridEnabled = !gridEnabled; gridOverlay.visibility = if (gridEnabled) View.VISIBLE else View.GONE; gridButton.text = if (gridEnabled) "Grid ON" else "Grid OFF" }
+                6 -> setZoom(1f)
+                else -> android.app.AlertDialog.Builder(this).setTitle("Camera support").setMessage("VivoCam uses Android CameraX. Manual ISO/shutter is available only on cameras that expose manual-sensor capability. Zoom, flash, focus, exposure and video quality vary by lens and firmware. Computational night stacking, RAW/DNG capture, 360° stitching and astro stacking are not yet implemented.").setPositiveButton("OK", null).show()
             }
         }.setPositiveButton("Close", null).show()
     }
 
     private fun textButton(label: String, size: Int, action: () -> Unit): TextView = TextView(this).apply {
         text = label; textSize = size.toFloat(); gravity = Gravity.CENTER; setTextColor(Color.WHITE); isClickable = true; isFocusable = true
+        background = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadius = dp(14).toFloat(); setColor(0x77202329); setStroke(dp(1), 0x44FFFFFF) }
+        setPadding(dp(5), 0, dp(5), 0)
         setOnClickListener { action() }
     }
     private fun weightParams() = LinearLayout.LayoutParams(0, dp(42), 1f)

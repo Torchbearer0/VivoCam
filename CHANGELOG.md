@@ -14,3 +14,15 @@
 - Added retry for transient Maven repository rate-limit/network failures in GitHub Actions.
 
 Advanced computational modes remain marked as not yet implemented in the app.
+
+
+## 0.3.0 — Pro controls and UI refinement
+
+- Added Camera2 capability detection for manual sensor exposure on the active camera.
+- Added Pro panel with ISO and shutter-time selection, bounded to reported sensor ranges.
+- Added an Auto action to restore automatic exposure; manual exposure disables flash.
+- Added clear messaging when the selected camera does not expose manual-sensor support.
+- Refined common controls with rounded, outlined surfaces and improved Pro/status labels.
+- Updated settings and support notes to distinguish implemented controls from computational-mode roadmap items.
+
+Manual controls must be verified on the Vivo X60 Pro because available camera capabilities vary by lens and firmware. RAW/DNG and computational long-exposure processing are still not implemented.
