@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.VivoCam" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:statusBarColor">#08090B</item>
+        <item name="android:navigationBarColor">#08090B</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorPrimary">#D8F36A</item>
+        <item name="colorPrimaryVariant">#A8C83F</item>
+        <item name="colorSecondary">#D8F36A</item>
+    </style>
+</resources>
