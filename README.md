@@ -27,7 +27,7 @@ gradle assembleDebug
 
 The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Included and functional in v0.3.0
+## Included and functional in v0.4.0
 
 - CameraX live preview and standard still photo capture to `Pictures/VivoCam`
 - Video recording with microphone audio (when permission is granted), saved to `Movies/VivoCam`
@@ -44,6 +44,11 @@ The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 - Manual exposure controls show the reported ISO/shutter ranges; enabling them disables automatic exposure and flash
 - Settings menu and open-latest-media shortcut
 - Refined rounded control surfaces, clearer mode/status labels, and a consistent dark camera layout
+- Replaced the old mid-viewfinder zoom/utility rows with a single bottom adjustment dock
+- Added live zoom and EV sliders, plus continuous ISO and logarithmic shutter sliders on supported manual-sensor cameras
+- Added live manual-focus distance where the lens reports a minimum focus distance; tap-to-focus remains the fallback
+- Added live white-balance presets (Auto, Tungsten, Fluorescent, Daylight, Cloudy)
+- Added quick bottom-dock toggles/cycles for timer, ratio, flash, grid and video quality; no modal is needed for common adjustments
 
 These controls are wired into CameraX rather than being decorative buttons. Actual flash, zoom, exposure range, focus behavior, and video resolution depend on the lens and device firmware.
 

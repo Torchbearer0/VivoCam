@@ -26,3 +26,16 @@ Advanced computational modes remain marked as not yet implemented in the app.
 - Updated settings and support notes to distinguish implemented controls from computational-mode roadmap items.
 
 Manual controls must be verified on the Vivo X60 Pro because available camera capabilities vary by lens and firmware. RAW/DNG and computational long-exposure processing are still not implemented.
+
+
+## 0.4.0 — bottom control dock and live adjustments
+
+- Removed the separate zoom and utility rows from the middle of the preview.
+- Added one bottom dock with a horizontal control selector and a live slider for the selected adjustment.
+- Zoom and EV now update while dragging; ISO and shutter sliders send live Camera2 request options when manual sensor support is available.
+- Added manual focus-distance control where the active lens exposes focus distance, with tap-to-focus fallback.
+- Added live white-balance cycling: Auto, Tungsten, Fluorescent, Daylight and Cloudy.
+- Added quick dock controls for timer, photo ratio, flash, composition grid and video quality.
+- Made Pro mode land on direct ISO controls instead of forcing the old dialog.
+
+Hardware-dependent behavior still requires a device build and testing on the Vivo X60 Pro.
