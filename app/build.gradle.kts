@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.vivocam"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 7
+        versionName = "0.7.0"
     }
 
     // Keep Java and Kotlin bytecode targets aligned for Gradle validation.
@@ -36,4 +36,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
     implementation("androidx.camera:camera-video:$camerax")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 }

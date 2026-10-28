@@ -27,7 +27,7 @@ gradle assembleDebug
 
 The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Included and functional in v0.4.0
+## Included and functional in v0.7.0
 
 - CameraX live preview and standard still photo capture to `Pictures/VivoCam`
 - Video recording with microphone audio (when permission is granted), saved to `Movies/VivoCam`
@@ -49,19 +49,25 @@ The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 - Added live manual-focus distance where the lens reports a minimum focus distance; tap-to-focus remains the fallback
 - Added live white-balance presets (Auto, Tungsten, Fluorescent, Daylight, Cloudy)
 - Added quick bottom-dock toggles/cycles for timer, ratio, flash, grid and video quality; no modal is needed for common adjustments
+- **ASTRO:** captures 8 frames and averages them to reduce random noise; uses manual ISO/shutter when available, but does not align stars between frames
+- **NIGHT:** captures and averages 6 frames for noise reduction; best with a steady phone
+- **LONG EXP:** captures 8 frames and maximum-intensity blends them to accumulate moving bright lights; this is not one continuous sensor exposure
+- **CLONE:** MIUI-inspired cumulative workflow: first shutter sets the background, subsequent shutter presses run on-device ML Kit selfie/person segmentation and add the detected person to the composition; the previous composite appears as a translucent alignment ghost over the live preview. Includes Undo, Reset, and Save composite actions. Keep the phone fixed; segmentation is best for one clearly visible person in good light. The overlay is a ghosting guide, not a full real-time background replacement.
+- **CINEMA:** adds cinematic framing bars to the live preview and records video at the selected CameraX quality; bars are framing guides and are not baked into the saved video
 
-These controls are wired into CameraX rather than being decorative buttons. Actual flash, zoom, exposure range, focus behavior, and video resolution depend on the lens and device firmware.
+Clone uses the ML Kit selfie-segmentation model dependency and may need network access the first time the model is downloaded, depending on Google Play services/model availability. These controls are wired into CameraX rather than being decorative buttons. Actual flash, zoom, exposure range, focus behavior, and video resolution depend on the lens and device firmware.
 
 ## Important limitations
 
-Advanced mode buttons are still UI/roadmap scaffolds unless explicitly listed as functional below. They display a message instead of pretending to produce computational effects.
+These computational modes are functional first implementations, not substitutes for dedicated computational photography pipelines:
 
-- **Long exposure:** the Pro panel can request manual shutter times only when the active camera reports manual-sensor capability. Waterfall/trail effects and robust long-exposure capture still need dedicated capture/stacking pipelines.
-- **Waterfall, fireworks, light painting/trails, traffic trails, star trails:** need per-mode exposure strategy, burst/frame accumulation, alignment and blending.
-- **Milky Way / M31:** requires RAW/manual exposure where available, dark-frame handling and stacking. A phone lens/sensor has real limits for deep-sky detail.
-- **Clone:** requires multiple timed captures, a stable camera, alignment, masks and compositing UI.
-- **360°:** requires guided overlapping images plus a panorama stitcher; this is not a single camera API toggle.
-- **Cinematic video:** current Video/Cinema mode records regular video. Depth segmentation, subject tracking and grading need a separate pipeline and may not be available in real time on this device.
+- **Astro:** average stack without star alignment, dark-frame subtraction, or RAW processing. Tripod use is strongly recommended.
+- **Long exposure:** multi-frame maximum-intensity blending can accumulate traffic/light trails, but is not a continuous long sensor exposure and can show artifacts if the camera moves.
+- **Clone:** person segmentation is automatic and processed on-device. It can miss hair, motion-blurred limbs, people partly outside the frame, or subjects in low light. Small camera shifts are not fully registered automatically; use a tripod or steady surface. The live overlay is translucent guidance rather than a true segmented live composite.
+- **Cinematic video:** preview-only letterbox guides; the recorded file is not cropped or color-graded and does not include depth-based subject separation.
+- **360°:** guided overlapping capture and panorama stitching are not included yet.
+- **Portrait:** depth-map blur is not included; capture falls back to a regular photo.
+- **RAW/DNG:** not included.
 
 ## Open in Android Studio
 
@@ -72,19 +78,23 @@ Advanced mode buttons are still UI/roadmap scaffolds unless explicitly listed as
 
 The project targets Android 8.0+ and uses CameraX 1.4.1. Actual lens availability, zoom, resolution, stabilization and manual sensor support depend on the device firmware. Test on the phone; an emulator is not sufficient for camera feature validation.
 
-## Suggested next implementation order
+## Next advanced feature stage
 
-1. Verify manual ISO/shutter behavior on each Vivo X60 Pro lens; improve per-lens switching and persistence.
-2. Add supported RAW/DNG capture through a compatible Camera2 capture pipeline.
-3. Implement burst/frame-stack capture for long exposure and astrophotography, with alignment and robust processing.
-4. Add clone capture guide, mask editor and compositor.
-5. Add guided panorama capture and stitching for 360° output.
-6. Prototype cinematic video with supported stabilization, focus tracking and post-processing; verify performance on the X60 Pro.
+1. Add star alignment, dark-frame subtraction, and higher-quality astro processing.
+2. Add a clone subject-mask editor so the user can select which pose regions are composited.
+3. Add guided panorama capture and a stitching pipeline for true 360° output.
+4. Add post-processed cinematic crop/color grading and verify whether hardware stabilization and focus tracking are exposed on the X60 Pro.
+5. Investigate RAW/DNG output through a compatible Camera2 capture pipeline.
 
 ## Build reliability
 
 The GitHub Actions workflow retries dependency resolution only when logs indicate a transient Maven/network problem (such as HTTP 429). Kotlin or Android compilation errors fail immediately, so a code issue does not trigger several unnecessary rebuilds inside one run.
 
-## Advanced modes still on the roadmap
+## Remaining advanced work
 
-Manual ISO/shutter controls are now available on cameras that report Camera2 manual-sensor capability. RAW/DNG capture, long-exposure stacking, astro stacking, clone compositing, 360° stitching, portrait depth processing, and cinematic depth effects still need dedicated capture/processing pipelines and are not yet implemented.
+Next stages could add star alignment and RAW/DNG support for astro, a clone mask editor, panorama stitching for 360°, and post-processed cinematic crop/color grading. These require additional pipelines beyond standard CameraX capture.
+
+
+### 0.6.0 imaging improvements
+
+Astro now performs translation-only registration before stacking: robust high-pass luminance matching estimates frame displacement, then aligned pixels are averaged to reduce random noise. This is not full rotation/affine star tracking, and tripod stability remains important. Clone mode now includes a brush/eraser mask editor to select regions from each of three captured poses. Cinema mode requests 24 FPS only when the active camera advertises a fixed 24 FPS range, and enables Camera2 video stabilization or optical stabilization when reported by the device. Actual recorded frame rate and stabilization depend on device/firmware support.

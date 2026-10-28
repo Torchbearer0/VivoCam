@@ -1,7 +1,5 @@
-# Build fix
+# Build notes for 0.7.0
 
-This version aligns Java and Kotlin compilation targets to JVM 17. It fixes the GitHub Actions error:
+This update adds the ML Kit selfie segmentation dependency (`com.google.mlkit:segmentation-selfie:16.0.0-beta6`) for on-device person masks in Clone mode. The first model use may require the ML Kit model to be available/downloaded. GitHub Actions should build the APK with the existing JDK 17 / Gradle 8.9 setup.
 
-`Inconsistent JVM-target compatibility detected for tasks 'compileDebugJavaWithJavac' (1.8) and 'compileDebugKotlin' (17).`
-
-Replace the files in your GitHub repository with this project's contents, commit, and push to rerun the Android CI workflow.
+If dependency resolution fails transiently, rerun the workflow. If compilation fails, preserve the full Gradle error log before changing versions.
