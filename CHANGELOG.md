@@ -72,3 +72,8 @@ Known limitations: astro frames are not star-aligned; long-exposure output is a 
 - Clone now opens an interactive mask editor after three pose captures. Select a pose, paint regions to include, adjust brush size, erase mask strokes, and build the composite. The editor uses reduced-resolution source frames to limit memory use.
 - Cinema requests 24 FPS only when the active camera reports an exact 24/24 FPS range, and requests Camera2 electronic stabilization when supported, falling back to optical stabilization metadata when available. Otherwise it keeps the camera usable and reports that a fixed 24 FPS range is unavailable.
 - Version bumped to 0.6.0 (versionCode 6).
+
+
+## 0.7.1 — Build fix
+
+- Fixed two Clone-mode Toast calls to explicitly use the Activity context, resolving Kotlin compilation errors reported by GitHub Actions.

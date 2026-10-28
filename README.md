@@ -27,7 +27,7 @@ gradle assembleDebug
 
 The APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Included and functional in v0.7.0
+## Included and functional in v0.7.1
 
 - CameraX live preview and standard still photo capture to `Pictures/VivoCam`
 - Video recording with microphone audio (when permission is granted), saved to `Movies/VivoCam`

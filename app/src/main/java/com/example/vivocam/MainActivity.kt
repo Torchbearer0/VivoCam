@@ -703,7 +703,7 @@ class MainActivity : AppCompatActivity() {
                             modeLabel.text = "CLONE · ${cloneUndoStack.size - 1} pose(s) added · keep shooting"
                             cloneActionRow.visibility = View.VISIBLE
                         } catch (e: Exception) {
-                            Toast.makeText(this, "Could not composite subject: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, "Could not composite subject: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                         } finally {
                             if (!subjectFrame.isRecycled) subjectFrame.recycle()
                             cloneProcessing = false; captureButton.isEnabled = true
@@ -713,7 +713,7 @@ class MainActivity : AppCompatActivity() {
                         if (!subjectFrame.isRecycled) subjectFrame.recycle()
                         cloneProcessing = false; captureButton.isEnabled = true
                         modeLabel.text = "CLONE · person detection failed"
-                        Toast.makeText(this, "On-device person segmentation failed: ${e.localizedMessage}. Try again in better light.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "On-device person segmentation failed: ${e.localizedMessage}. Try again in better light.", Toast.LENGTH_LONG).show()
                     }
             }
             override fun onError(exception: ImageCaptureException) {
